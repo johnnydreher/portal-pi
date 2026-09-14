@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Race Timing</title>
+    <style>
+        body { font-family: sans-serif; background: #111; color: #eee; margin: 0; padding: 20px; }
+        h1 { text-align: center; }
+        .gates { display: flex; gap: 16px; justify-content: center; margin-bottom: 32px; }
+        .gate { flex: 1; max-width: 200px; padding: 16px; border-radius: 8px; background: #222; text-align: center; }
+        .gate.active { background: #2a5; }
+        .gate .time { font-size: 1.5rem; font-family: monospace; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px; border-bottom: 1px solid #333; text-align: center; }
+    </style>
+</head>
+<body>
+    <h1>Race Timing</h1>
+    <div class="gates" id="gates"></div>
+    <table id="results">
+        <thead><tr><th>#</th><th>Split 1</th><th>Split 2</th><th>Finish</th></tr></thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        const GATE_ORDER = ['start', 'split1', 'split2', 'finish'];
+
+        async function updateStatus() {
+            const res = await fetch('/api/status');
+            const data = await res.json();
+            const container = document.getElementById('gates');
+            container.innerHTML = GATE_ORDER.map(name => `
+                <div class="gate ${data.gates[name] ? 'active' : ''}">
+                    <div>${name}</div>
+                    <div class="time">${data.current_run?.splits?.[name]?.toFixed(2) ?? '--'}s</div>
+                </div>
+            `).join('');
+        }
+
+        async function updateResults() {
+            const res = await fetch('/api/results');
+            const data = await res.json();
+            const tbody = document.querySelector('#results tbody');
+            tbody.innerHTML = data.runs.slice(0, 20).map((run, i) => `
+                <tr>
+                    <td>${data.count - i}</td>
+                    <td>${run.split1_s?.toFixed(2) ?? '--'}</td>
+                    <td>${run.split2_s?.toFixed(2) ?? '--'}</td>
+                    <td>${run.finish_s?.toFixed(2) ?? '--'}</td>
+                </tr>
+            `).join('');
+        }
+
+        setInterval(updateStatus, 500);
+        setInterval(updateResults, 1000);
+        updateStatus();
+        updateResults();
+    </script>
+</body>
+</html>
