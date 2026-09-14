@@ -1,0 +1,22 @@
+serial:
+  port: /dev/ttyUSB0
+  baud: 9600
+
+calibration:
+  thresholds:
+    start: 20
+    split1: 20
+    split2: 20
+    finish: 20
+
+detection:
+  history_size: 5
+  min_passage_duration_ms: 50
+  max_passage_duration_s: 5.0
+
+data:
+  db_file: ./data/runs.db
+
+web:
+  host: "0.0.0.0"
+  port: 5000

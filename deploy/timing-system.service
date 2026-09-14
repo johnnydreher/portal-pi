@@ -1,0 +1,14 @@
+[Unit]
+Description=Timing System for Robot Races
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/portal-pi
+ExecStart=/usr/bin/python3 /home/pi/portal-pi/main.py --config /home/pi/portal-pi/config.yaml
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
