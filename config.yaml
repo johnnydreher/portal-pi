@@ -1,6 +1,16 @@
-serial:
-  port: /dev/ttyUSB0
-  baud: 9600
+gpio:
+  start:
+    trigger: 17
+    echo: 27
+  split1:
+    trigger: 22
+    echo: 23
+  split2:
+    trigger: 24
+    echo: 25
+  finish:
+    trigger: 26
+    echo: 19
 
 calibration:
   thresholds:

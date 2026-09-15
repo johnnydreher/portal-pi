@@ -12,19 +12,19 @@ SAMPLE_CONFIG = {
 
 def test_build_state_creates_all_gates():
     state = build_state(SAMPLE_CONFIG)
-    assert set(state.gates.keys()) == set(GATE_NAMES.values())
+    assert set(state.gates.keys()) == set(GATE_NAMES)
 
 
 def test_on_reading_drives_race_engine_through_full_run():
     state = build_state(SAMPLE_CONFIG)
 
-    on_reading(state, 1, 35, 0.0)
-    on_reading(state, 1, 10, 0.1)  # start enter
-    on_reading(state, 1, 35, 0.3)  # start exit
+    on_reading(state, 'start', 35, 0.0)
+    on_reading(state, 'start', 10, 0.1)  # start enter
+    on_reading(state, 'start', 35, 0.3)  # start exit
 
-    on_reading(state, 4, 35, 1.0)
-    on_reading(state, 4, 10, 1.1)  # finish enter
-    on_reading(state, 4, 35, 1.3)  # finish exit -> completes run
+    on_reading(state, 'finish', 35, 1.0)
+    on_reading(state, 'finish', 10, 1.1)  # finish enter
+    on_reading(state, 'finish', 35, 1.3)  # finish exit -> completes run
 
     assert state.race_engine.current_run is None
     runs = get_recent_runs(state.db_conn)
