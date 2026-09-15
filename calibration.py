@@ -1,17 +1,18 @@
 """
-Samples each sensor's empty-track baseline directly via GPIO and writes
-suggested thresholds into config.yaml.
+Samples each sensor's empty-track baseline over both Arduino boards' USB
+ports and writes suggested thresholds into config.yaml.
 
 Usage: python3 calibration.py --config config.yaml --samples 20
 """
 import argparse
 import time
 
+import serial
 import yaml
 
-from gpio_reader import GpioSensor
+from serial_reader import parse_frame
 
-GATE_NAMES = ('start', 'split1', 'split2', 'finish')
+GATE_NAMES = {1: 'start', 2: 'split1', 3: 'split2', 4: 'finish'}
 
 
 def compute_baseline_and_threshold(samples, robot_height_cm=12, safety_margin_cm=3):
@@ -26,15 +27,26 @@ def compute_baseline_and_threshold(samples, robot_height_cm=12, safety_margin_cm
     return baseline, threshold
 
 
-def collect_samples(sensors, samples_per_sensor):
-    """sensors: dict[str, GpioSensor]. Returns dict[str, list[float]]."""
-    collected = {name: [] for name in sensors}
-    for name, sensor in sensors.items():
-        while len(collected[name]) < samples_per_sensor:
-            distance = sensor.measure_distance_cm()
-            if distance is not None:
-                collected[name].append(distance)
-            time.sleep(0.05)
+def collect_samples(boards, samples_per_sensor, timeout_s=15):
+    """
+    boards: list of (port, baud) tuples, one per Arduino.
+    Reads frames from all boards until `samples_per_sensor` readings are
+    collected per sensor ID (1-4). Returns dict[int, list[float]].
+    """
+    serials = [serial.Serial(port, baud, timeout=1) for port, baud in boards]
+    collected = {1: [], 2: [], 3: [], 4: []}
+    deadline = time.time() + timeout_s
+    while time.time() < deadline and any(len(v) < samples_per_sensor for v in collected.values()):
+        for ser in serials:
+            if ser.in_waiting:
+                raw = ser.readline().decode('utf-8', errors='ignore')
+                parsed = parse_frame(raw)
+                if parsed:
+                    sensor_id, distance = parsed
+                    if len(collected[sensor_id]) < samples_per_sensor:
+                        collected[sensor_id].append(distance)
+    for ser in serials:
+        ser.close()
     return collected
 
 
@@ -47,18 +59,19 @@ def main():
     with open(args.config) as f:
         config = yaml.safe_load(f)
 
-    sensors = {
-        name: GpioSensor(config['gpio'][name]['trigger'], config['gpio'][name]['echo'])
-        for name in GATE_NAMES
-    }
+    boards = [(b['port'], b['baud']) for b in config['serial']['boards']]
 
     input("Make sure the track is empty, then press ENTER...")
-    collected = collect_samples(sensors, args.samples)
+    collected = collect_samples(boards, args.samples)
 
-    for name, samples in collected.items():
+    for sensor_id, samples in collected.items():
+        if not samples:
+            print(f"WARNING: no samples collected for sensor {sensor_id}, skipping")
+            continue
         baseline, threshold = compute_baseline_and_threshold(samples)
-        config['calibration']['thresholds'][name] = round(threshold, 1)
-        print(f"{name}: baseline={baseline:.1f}cm threshold={threshold:.1f}cm")
+        gate_name = GATE_NAMES[sensor_id]
+        config['calibration']['thresholds'][gate_name] = round(threshold, 1)
+        print(f"{gate_name}: baseline={baseline:.1f}cm threshold={threshold:.1f}cm")
 
     with open(args.config, 'w') as f:
         yaml.safe_dump(config, f)
