@@ -4,13 +4,13 @@ from storage import get_recent_runs
 
 
 class AppState:
-    """Shared state Flask routes read from; updated by the background thread."""
+    """Shared state Flask routes read from; updated by the background threads."""
 
-    def __init__(self, gates, race_engine, db_conn, reader=None):
+    def __init__(self, gates, race_engine, db_conn, readers=None):
         self.gates = gates              # dict[str, TimingGate]
         self.race_engine = race_engine  # RaceEngine
         self.db_conn = db_conn          # sqlite3 connection
-        self.reader = reader            # SerialReader, set once connected (may be None)
+        self.readers = readers          # list[SerialReader], set once connected (may be None)
 
 
 def create_app(state):
@@ -23,7 +23,7 @@ def create_app(state):
     @app.route('/api/status')
     def api_status():
         return jsonify({
-            'connected': bool(state.reader and state.reader.connected),
+            'connected': bool(state.readers) and all(r.connected for r in state.readers),
             'current_run': state.race_engine.current_run,
             'gates': {name: gate.is_obstructed for name, gate in state.gates.items()},
         })
