@@ -1,4 +1,4 @@
 flask
+pyserial
 pyyaml
 pytest
-RPi.GPIO; platform_machine == "armv6l" or platform_machine == "armv7l" or platform_machine == "aarch64"
