@@ -1,19 +1,19 @@
 """
-Entry point: wires the GPIO reader, timing gates, race engine, storage,
-and the Flask web app together, then runs the web server.
+Entry point: wires the two boards' serial readers, timing gates, race
+engine, storage, and the Flask web app together, then runs the web server.
 """
 import argparse
 import threading
 
 import yaml
 
-from gpio_reader import GpioReader, GpioSensor
 from race_engine import RaceEngine
+from serial_reader import SerialReader
 from storage import init_db, save_run
 from timing_gate import TimingGate
 from web import AppState, create_app
 
-GATE_NAMES = ('start', 'split1', 'split2', 'finish')
+GATE_NAMES = {1: 'start', 2: 'split1', 3: 'split2', 4: 'finish'}
 
 
 def build_state(config):
@@ -24,12 +24,12 @@ def build_state(config):
             min_passage_duration_s=config['detection']['min_passage_duration_ms'] / 1000,
             max_passage_duration_s=config['detection']['max_passage_duration_s'],
         )
-        for name in GATE_NAMES
+        for name in GATE_NAMES.values()
     }
     db_conn = init_db(config['data']['db_file'])
 
     def on_run_complete(run):
-        # A write failure must not crash the background GPIO-polling thread —
+        # A write failure must not crash a background reading thread —
         # log it and keep going (per spec: "not retried automatically").
         try:
             save_run(db_conn, run)
@@ -40,7 +40,8 @@ def build_state(config):
     return AppState(gates=gates, race_engine=race_engine, db_conn=db_conn)
 
 
-def on_reading(state, gate_name, distance, timestamp):
+def on_reading(state, sensor_id, distance, timestamp):
+    gate_name = GATE_NAMES[sensor_id]
     event = state.gates[gate_name].check_passage(distance, timestamp)
     if event:
         state.race_engine.handle_event(gate_name, event, timestamp)
@@ -56,18 +57,18 @@ def main():
 
     state = build_state(config)
 
-    sensors = {
-        name: GpioSensor(config['gpio'][name]['trigger'], config['gpio'][name]['echo'])
-        for name in GATE_NAMES
-    }
-    reader = GpioReader(
-        sensors=sensors,
-        on_reading=lambda gate, dist, ts: on_reading(state, gate, dist, ts),
-    )
-    reader.connect()
-    state.reader = reader
-    thread = threading.Thread(target=reader.run, daemon=True)
-    thread.start()
+    readers = []
+    for board in config['serial']['boards']:
+        reader = SerialReader(
+            port=board['port'],
+            baud=board['baud'],
+            on_reading=lambda sid, dist, ts: on_reading(state, sid, dist, ts),
+        )
+        reader.connect()
+        thread = threading.Thread(target=reader.run, daemon=True)
+        thread.start()
+        readers.append(reader)
+    state.readers = readers
 
     app = create_app(state)
     app.run(host=config['web']['host'], port=config['web']['port'])
