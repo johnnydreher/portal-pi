@@ -1,7 +1,9 @@
+import os
 import re
 import time
 
 import serial
+from serial.tools import list_ports
 
 FRAME_RE = re.compile(r'^\[(\d+),(\d+)\]$')
 
@@ -55,3 +57,33 @@ class SerialReader:
         self._running = False
         if self._ser:
             self._ser.close()
+
+
+def _resolve_by_path_map(by_path_dir):
+    """Maps a device path (e.g. '/dev/ttyUSB0') to its stable by-path symlink,
+    for every symlink found in by_path_dir. Empty dict if the dir doesn't exist
+    (non-Linux dev machines, or a Pi without /dev/serial/by-path populated)."""
+    if not os.path.isdir(by_path_dir):
+        return {}
+    mapping = {}
+    for name in os.listdir(by_path_dir):
+        full = os.path.join(by_path_dir, name)
+        try:
+            mapping[os.path.realpath(full)] = full
+        except OSError:
+            continue
+    return mapping
+
+
+def list_available_ports(comports_fn=list_ports.comports, by_path_dir='/dev/serial/by-path'):
+    """
+    Returns every connected serial port as {'port_id': str, 'device': str}.
+    port_id is the physical-USB-port-based /dev/serial/by-path id when available
+    (stable across reboots, unlike USB serial numbers on cheap CH340 clones which
+    are often duplicated) — falls back to the raw device path otherwise.
+    """
+    by_path_map = _resolve_by_path_map(by_path_dir)
+    return [
+        {'port_id': by_path_map.get(p.device, p.device), 'device': p.device}
+        for p in comports_fn()
+    ]
