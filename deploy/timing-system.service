@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/portal-pi
-ExecStart=/usr/bin/python3 /home/pi/portal-pi/main.py --config /home/pi/portal-pi/config.yaml
+User=dreher
+WorkingDirectory=/home/dreher/portal-pi
+ExecStart=/home/dreher/portal-pi/venv/bin/python3 /home/dreher/portal-pi/main.py --config /home/dreher/portal-pi/config.yaml
 Restart=always
 RestartSec=10
 
