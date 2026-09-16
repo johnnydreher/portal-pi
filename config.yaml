@@ -1,17 +1,3 @@
-serial:
-  boards:
-    - port: /dev/ttyUSB0
-      baud: 9600
-    - port: /dev/ttyUSB1
-      baud: 9600
-
-calibration:
-  thresholds:
-    start: 20
-    split1: 20
-    split2: 20
-    finish: 20
-
 detection:
   history_size: 5
   min_passage_duration_ms: 50

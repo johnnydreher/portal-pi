@@ -1,30 +1,33 @@
 """
-Entry point: wires the two boards' serial readers, timing gates, race
-engine, storage, and the Flask web app together, then runs the web server.
+Entry point: auto-discovers connected Arduino boards over USB, wires them
+into per-gate detection via the saved calibration mapping, and runs the
+timing pipeline + Flask dashboard/calibration screen.
 """
 import argparse
 import threading
+from collections import deque
 
 import yaml
 
+from calibration import load_calibration, resolve_gate
 from race_engine import RaceEngine
-from serial_reader import SerialReader
+from serial_reader import SerialReader, list_available_ports
 from storage import init_db, save_run
 from timing_gate import TimingGate
 from web import AppState, create_app
 
-GATE_NAMES = {1: 'start', 2: 'split1', 3: 'split2', 4: 'finish'}
+BAUD = 9600
 
 
-def build_state(config):
+def build_state(config, calibration, calibration_path):
     gates = {
-        name: TimingGate(
-            threshold_cm=config['calibration']['thresholds'][name],
+        gate: TimingGate(
+            threshold_cm=threshold,
             history_size=config['detection']['history_size'],
             min_passage_duration_s=config['detection']['min_passage_duration_ms'] / 1000,
             max_passage_duration_s=config['detection']['max_passage_duration_s'],
         )
-        for name in GATE_NAMES.values()
+        for gate, threshold in calibration['thresholds'].items()
     }
     db_conn = init_db(config['data']['db_file'])
 
@@ -37,37 +40,48 @@ def build_state(config):
             print(f"ERROR: failed to save run: {e}")
 
     race_engine = RaceEngine(on_run_complete=on_run_complete)
-    return AppState(gates=gates, race_engine=race_engine, db_conn=db_conn)
+    return AppState(
+        race_engine=race_engine,
+        db_conn=db_conn,
+        calibration=calibration,
+        calibration_path=calibration_path,
+        gates=gates,
+    )
 
 
-def on_reading(state, sensor_id, distance, timestamp):
-    gate_name = GATE_NAMES[sensor_id]
-    event = state.gates[gate_name].check_passage(distance, timestamp)
-    if event:
-        state.race_engine.handle_event(gate_name, event, timestamp)
+def on_reading(state, port_id, relative_sensor_id, distance, timestamp):
+    key = (port_id, str(relative_sensor_id))
+    state.readings.setdefault(key, deque(maxlen=20)).append(distance)
+
+    gate_name = resolve_gate(state.calibration['port_map'], port_id, relative_sensor_id)
+    if gate_name and gate_name in state.gates:
+        event = state.gates[gate_name].check_passage(distance, timestamp)
+        if event:
+            state.race_engine.handle_event(gate_name, event, timestamp)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default='config.yaml')
+    parser.add_argument('--calibration', default='calibration.yaml')
     args = parser.parse_args()
 
     with open(args.config) as f:
         config = yaml.safe_load(f)
+    calibration = load_calibration(args.calibration)
 
-    state = build_state(config)
+    state = build_state(config, calibration, args.calibration)
 
     readers = []
-    for board in config['serial']['boards']:
-        reader = SerialReader(
-            port=board['port'],
-            baud=board['baud'],
-            on_reading=lambda sid, dist, ts: on_reading(state, sid, dist, ts),
-        )
+    for port in list_available_ports():
+        def make_callback(port_id):
+            return lambda rel_id, dist, ts: on_reading(state, port_id, rel_id, dist, ts)
+
+        reader = SerialReader(port=port['device'], baud=BAUD, on_reading=make_callback(port['port_id']))
         reader.connect()
         thread = threading.Thread(target=reader.run, daemon=True)
         thread.start()
-        readers.append(reader)
+        readers.append({'port_id': port['port_id'], 'device': port['device'], 'reader': reader})
     state.readers = readers
 
     app = create_app(state)
