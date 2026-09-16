@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Calibração</title>
+    <style>
+        body { font-family: sans-serif; background: #111; color: #eee; margin: 0; padding: 20px; }
+        h1, h2 { text-align: center; }
+        .port { background: #222; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+        .port.disconnected { opacity: 0.5; }
+        .sensor { display: inline-block; width: 45%; margin: 4px; vertical-align: top; }
+        .distance { font-family: monospace; font-size: 1.2rem; }
+        select, button { font-size: 1rem; padding: 4px; margin-top: 4px; }
+        .gate-row { background: #222; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+        .result { font-family: monospace; margin-left: 12px; }
+        a { color: #6cf; }
+    </style>
+</head>
+<body>
+    <h1>Calibração</h1>
+    <p><a href="/">&larr; Dashboard</a></p>
+
+    <h2>1. Associar sensores às portas</h2>
+    <div id="ports"></div>
+    <button id="save-map">Salvar mapeamento</button>
+    <div id="map-warning" style="color:#f66"></div>
+
+    <h2>2. Calibrar thresholds (pista vazia)</h2>
+    <div id="gates"></div>
+
+    <script>
+        const GATE_LABELS = { start: 'Start', split1: 'Split 1', split2: 'Split 2', finish: 'Finish' };
+
+        async function refreshPorts() {
+            const res = await fetch('/api/calibration/ports');
+            const data = await res.json();
+
+            document.getElementById('ports').innerHTML = data.ports.map(port => `
+                <div class="port ${port.connected ? '' : 'disconnected'}">
+                    <strong>${port.device}</strong> ${port.connected ? '' : '(desconectado)'}
+                    ${['1', '2'].map(id => `
+                        <div class="sensor">
+                            Sensor ${id}: <span class="distance">${port.sensors[id].distance ?? '--'}cm</span><br>
+                            <select data-port="${port.port_id}" data-sensor="${id}">
+                                <option value="">não usado</option>
+                                ${data.gate_choices.map(g => `
+                                    <option value="${g}" ${port.sensors[id].gate === g ? 'selected' : ''}>${GATE_LABELS[g]}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('') || '<p>Nenhuma porta detectada.</p>';
+
+            if (!document.getElementById('gates').dataset.rendered) {
+                document.getElementById('gates').innerHTML = data.gate_choices.map(gate => `
+                    <div class="gate-row">
+                        ${GATE_LABELS[gate]}
+                        <button onclick="measure('${gate}')">Medir</button>
+                        <span class="result" id="result-${gate}"></span>
+                    </div>
+                `).join('');
+                document.getElementById('gates').dataset.rendered = '1';
+            }
+        }
+
+        async function measure(gate) {
+            const res = await fetch(`/api/calibration/measure/${gate}`, { method: 'POST' });
+            const data = await res.json();
+            const resultEl = document.getElementById(`result-${gate}`);
+            if (!res.ok) {
+                resultEl.textContent = 'sem leituras ainda';
+                return;
+            }
+            resultEl.innerHTML = `baseline ${data.baseline_cm}cm, threshold ${data.threshold_cm}cm
+                <button onclick="saveThreshold('${gate}', ${data.threshold_cm})">Salvar</button>`;
+        }
+
+        async function saveThreshold(gate, thresholdCm) {
+            await fetch('/api/calibration/thresholds', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gate, threshold_cm: thresholdCm }),
+            });
+            document.getElementById(`result-${gate}`).textContent = 'salvo';
+        }
+
+        document.getElementById('save-map').addEventListener('click', async () => {
+            const assignments = Array.from(document.querySelectorAll('#ports select')).map(sel => ({
+                port_id: sel.dataset.port,
+                sensor: Number(sel.dataset.sensor),
+                gate: sel.value || null,
+            }));
+            const res = await fetch('/api/calibration/map', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ assignments }),
+            });
+            const data = await res.json();
+            document.getElementById('map-warning').textContent = data.duplicate_gates.length
+                ? `Atenção: gate(s) atribuído a mais de um sensor: ${data.duplicate_gates.join(', ')}`
+                : '';
+        });
+
+        setInterval(refreshPorts, 300);
+        refreshPorts();
+    </script>
+</body>
+</html>
