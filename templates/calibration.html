@@ -29,7 +29,7 @@
     <div id="gates"></div>
 
     <script>
-        const GATE_LABELS = { start: 'Start', split1: 'Split 1', split2: 'Split 2', finish: 'Finish' };
+        const GATE_LABELS = { start: 'Start', split1: 'Split 1', finish: 'Finish' };
 
         async function refreshPorts() {
             const res = await fetch('/api/calibration/ports');

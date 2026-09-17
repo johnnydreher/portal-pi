@@ -4,7 +4,7 @@ from calibration import compute_baseline_and_threshold, resolve_gate, save_calib
 from storage import get_recent_runs
 from timing_gate import TimingGate
 
-GATE_CHOICES = ('start', 'split1', 'split2', 'finish')
+GATE_CHOICES = ('start', 'split1', 'finish')
 
 
 class AppState:

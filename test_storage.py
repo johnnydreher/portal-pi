@@ -3,7 +3,7 @@ from storage import init_db, save_run, get_recent_runs
 
 def test_save_and_retrieve_run():
     conn = init_db(':memory:')
-    run = {'start_ts': 100.0, 'splits': {'split1': 1.2, 'split2': 2.4, 'finish': 3.6}}
+    run = {'start_ts': 100.0, 'splits': {'split1': 1.2, 'finish': 3.6}}
 
     row_id = save_run(conn, run)
     assert row_id == 1
@@ -11,7 +11,6 @@ def test_save_and_retrieve_run():
     runs = get_recent_runs(conn)
     assert len(runs) == 1
     assert runs[0]['split1_s'] == 1.2
-    assert runs[0]['split2_s'] == 2.4
     assert runs[0]['finish_s'] == 3.6
 
 

@@ -11,14 +11,11 @@ def test_full_run_produces_all_splits():
     result = engine.handle_event('split1', 'exit', 1.2)
     assert result is None  # not finished yet
 
-    engine.handle_event('split2', 'enter', 2.0)
-    engine.handle_event('split2', 'exit', 2.2)
     engine.handle_event('finish', 'enter', 3.0)
     result = engine.handle_event('finish', 'exit', 3.2)
 
     assert result is not None
     assert result['splits']['split1'] == 1.2
-    assert result['splits']['split2'] == 2.2
     assert result['splits']['finish'] == 3.2
     assert completed_runs == [result]
 

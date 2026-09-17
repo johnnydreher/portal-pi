@@ -1,8 +1,8 @@
-GATE_ORDER = ('start', 'split1', 'split2', 'finish')
+GATE_ORDER = ('start', 'split1', 'finish')
 
 
 class RaceEngine:
-    """Sequences gate enter/exit events from all 4 portals into completed runs."""
+    """Sequences gate enter/exit events from all 3 portals into completed runs."""
 
     def __init__(self, on_run_complete=None):
         self.current_run = None

@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     start_ts REAL NOT NULL,
     split1_s REAL,
-    split2_s REAL,
     finish_s REAL,
     created_at TEXT NOT NULL
 );
@@ -24,17 +23,16 @@ def init_db(path):
 def save_run(conn, run):
     """
     Persist a completed run.
-    run: {'start_ts': float, 'splits': {'split1': float, 'split2': float, 'finish': float}}
+    run: {'start_ts': float, 'splits': {'split1': float, 'finish': float}}
     Returns the new row id.
     """
     splits = run['splits']
     cursor = conn.execute(
-        "INSERT INTO runs (start_ts, split1_s, split2_s, finish_s, created_at) "
-        "VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO runs (start_ts, split1_s, finish_s, created_at) "
+        "VALUES (?, ?, ?, ?)",
         (
             run['start_ts'],
             splits.get('split1'),
-            splits.get('split2'),
             splits.get('finish'),
             datetime.now(timezone.utc).isoformat(),
         ),
@@ -46,7 +44,7 @@ def save_run(conn, run):
 def get_recent_runs(conn, limit=50):
     """Return the most recent runs, newest first, as a list of dicts."""
     cursor = conn.execute(
-        "SELECT id, start_ts, split1_s, split2_s, finish_s, created_at "
+        "SELECT id, start_ts, split1_s, finish_s, created_at "
         "FROM runs ORDER BY id DESC LIMIT ?",
         (limit,),
     )

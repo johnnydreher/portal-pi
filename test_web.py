@@ -20,7 +20,7 @@ def make_state(calibration=None, readers=None, gates=None, calibration_path='cal
         db_conn=conn,
         calibration=calibration or {'port_map': {}, 'thresholds': {}},
         calibration_path=calibration_path,
-        gates=gates if gates is not None else {name: TimingGate() for name in ('start', 'split1', 'split2', 'finish')},
+        gates=gates if gates is not None else {name: TimingGate() for name in ('start', 'split1', 'finish')},
         readers=readers or [],
     )
 
@@ -34,7 +34,7 @@ def test_status_returns_gate_state():
 
     assert data['connected'] is False
     assert data['current_run'] is None
-    assert set(data['gates'].keys()) == {'start', 'split1', 'split2', 'finish'}
+    assert set(data['gates'].keys()) == {'start', 'split1', 'finish'}
 
 
 def test_results_returns_saved_runs():

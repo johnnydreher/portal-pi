@@ -19,12 +19,12 @@
     <p style="text-align:center"><a href="/calibration" style="color:#6cf">Calibração</a></p>
     <div class="gates" id="gates"></div>
     <table id="results">
-        <thead><tr><th>#</th><th>Split 1</th><th>Split 2</th><th>Finish</th></tr></thead>
+        <thead><tr><th>#</th><th>Split 1</th><th>Finish</th></tr></thead>
         <tbody></tbody>
     </table>
 
     <script>
-        const GATE_ORDER = ['start', 'split1', 'split2', 'finish'];
+        const GATE_ORDER = ['start', 'split1', 'finish'];
 
         async function updateStatus() {
             const res = await fetch('/api/status');
@@ -46,7 +46,6 @@
                 <tr>
                     <td>${data.count - i}</td>
                     <td>${run.split1_s?.toFixed(2) ?? '--'}</td>
-                    <td>${run.split2_s?.toFixed(2) ?? '--'}</td>
                     <td>${run.finish_s?.toFixed(2) ?? '--'}</td>
                 </tr>
             `).join('');
